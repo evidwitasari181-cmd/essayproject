@@ -1,0 +1,1024 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AksiBhinneka - Platform Micro-Volunteering PPKn</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    </style>
+      <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+</head>
+<body class="bg-blue-50/50 font-sans text-slate-800">
+
+    <!-- ================= MODAL LOGIN (BISA DI-SCROLL) ================= -->
+    <div id="auth-modal" class="fixed inset-0 bg-slate-900/70 z-50 overflow-y-auto flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full p-8 shadow-xl space-y-6 border border-blue-100 my-auto">
+            <div class="text-center space-y-3">
+                <div class="w-20 h-20 mx-auto flex items-center justify-center bg-amber-50 rounded-2xl border border-amber-200 text-4xl shadow-sm">
+                    🦅
+                </div>
+                <h1 class="text-2xl font-bold text-blue-900">AksiBhinneka</h1>
+                <p class="text-sm text-slate-600 font-medium">Belajar nilai Pancasila mulai dari aksi nyata</p>
+            </div>
+            
+            <div class="flex bg-slate-100 p-1 rounded-xl">
+                <button onclick="switchLoginTab('student')" id="tab-student" class="flex-1 py-2 text-sm font-semibold rounded-lg bg-white shadow-sm transition text-blue-900">Siswa</button>
+                <button onclick="switchLoginTab('teacher')" id="tab-teacher" class="flex-1 py-2 text-sm font-semibold text-slate-500 transition">Guru</button>
+            </div>
+
+            <!-- Form Siswa -->
+            <form id="form-student" onsubmit="handleLogin(event, 'student')" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-slate-700">Nama Lengkap</label>
+                    <input type="text" id="student-name" required class="w-full p-3 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Contoh: Caca">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-slate-700">Kelas</label>
+                    <input type="text" id="student-class" required class="w-full p-3 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Contoh: XI IPA 1">
+                </div>
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition shadow-lg shadow-blue-600/20">Masuk Sebagai Siswa</button>
+            </form>
+
+            <!-- Form Guru -->
+            <form id="form-teacher" onsubmit="handleLogin(event, 'teacher')" class="space-y-4 hidden">
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-slate-700">Nama Guru</label>
+                    <input type="text" id="teacher-name" required class="w-full p-3 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Contoh: Ibu Rina, M.Pd">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-slate-700">Kode Akses Khusus Guru</label>
+                    <input type="password" id="teacher-code" class="w-full p-3 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Masukkan kode rahasia">
+                    <p class="text-xs text-slate-400 mt-1"><strong></strong></p>
+                </div>
+                <div id="teacher-error-msg" class="text-xs text-rose-600 font-semibold hidden">⚠️ Kode akses salah! Silakan coba lagi.</div>
+                <button type="submit" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold py-3 rounded-xl transition">Masuk Dashboard Guru</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ================= MAIN APP CONTAINER ================= -->
+    <div id="app-container" class="flex h-screen overflow-hidden hidden">
+        
+        <!-- SIDEBAR BISA DI-SCROLL DAN RESPONSIF -->
+        <aside id="app-sidebar" class="fixed inset-y-0 left-0 z-40 w-64 bg-white border-r border-blue-100 flex flex-col justify-between transform -translate-x-full transition-transform duration-300 ease-in-out shadow-xl overflow-y-auto"></aside>
+        
+        <!-- Backdrop transparan saat sidebar terbuka di HP -->
+        <div id="sidebar-overlay" onclick="toggleSidebar()" class="fixed inset-0 bg-slate-900/50 z-30 hidden"></div>
+
+        <!-- KONTEN UTAMA -->
+        <main class="flex-1 flex flex-col h-screen overflow-y-auto w-full">
+            <header class="bg-white border-b border-blue-100 px-6 py-4 flex justify-between items-center sticky top-0 z-20 shadow-sm">
+    <div class="flex items-center space-x-3">
+        <button onclick="toggleSidebar()" class="text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 transition" title="Buka/Tutup Sidebar"><i data-lucide="menu" class="w-6 h-6"></i></button>
+        <div class="w-8 h-8 flex items-center justify-center bg-amber-50 rounded-lg border border-amber-200 text-lg">🦅</div>
+        <h1 id="page-title" class="text-lg md:text-xl font-bold text-blue-900">Dashboard</h1>
+    </div>
+    <!-- Tambahkan class flex items-center agar badge XP selalu sejajar secara vertikal -->
+    <div id="header-right-info" class="flex items-center"></div>
+</header>
+
+            <div class="p-6 md:p-8 max-w-5xl mx-auto w-full space-y-6">
+                
+                <!-- ================= DASHBOARD SISWA ================= -->
+                <div id="view-student-dashboard" class="space-y-6 hidden">
+                    <div class="bg-gradient-to-r from-blue-700 to-indigo-800 text-white p-8 rounded-2xl shadow-md space-y-3 relative overflow-hidden">
+                        <div class="absolute right-4 bottom-2 w-28 h-28 opacity-20 flex items-center justify-center text-8xl">🦅</div>
+                        <div class="flex items-center space-x-2 text-blue-200 text-sm font-semibold">
+                            <span>🇮🇩 Platform Pendidikan Pancasila & Kewarganegaraan</span>
+                        </div>
+                        <h2 class="text-2xl font-bold">Belajar nilai Pancasila mulai dari aksi nyata</h2>
+                        <p class="text-blue-100 text-sm max-w-2xl leading-relaxed">
+                            Wujudkan nilai-nilai kebangsaan melalui micro-volunteering. Selesaikan misi sosial, validasi objek dengan AI, kumpulkan XP, dan jadilah teladan bangsa!
+                        </p>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="bg-white p-6 rounded-2xl border border-blue-100 shadow-sm">
+                            <p class="text-sm text-slate-500">Total Tema Misi Tersedia</p>
+                            <h3 class="text-3xl font-bold text-blue-900 mt-1">4 Misi Esai</h3>
+                            <button onclick="navigate('student-missions')" class="mt-4 text-xs font-semibold text-blue-700 bg-blue-50 px-3 py-2 rounded-xl border border-blue-200 hover:bg-blue-100 transition">Mulai Kerjakan Misi →</button>
+                        </div>
+                        <div class="bg-white p-6 rounded-2xl border border-blue-100 shadow-sm">
+                            <p class="text-sm text-slate-500">Perolehan Poin Anda</p>
+                            <h3 id="dash-student-xp" class="text-3xl font-bold text-amber-500 mt-1">0 XP</h3>
+                            <span class="text-xs text-slate-400 mt-2 inline-block">Kumpulkan poin dari setiap aksi positif</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- HALAMAN MISI SISWA -->
+                <div id="view-student-missions" class="space-y-6 hidden">
+                    <div class="bg-blue-50 border border-blue-200 p-4 rounded-xl text-blue-900 text-sm flex items-center space-x-3">
+                        <span class="text-xl">💡</span>
+                        <p><strong>Selesaikan misi, tuliskan pikiranmu dan dokumentasikan aksi positifmu di lingkungan sekitar.</strong></p>
+                    </div>
+                    <h2 class="text-lg font-bold text-slate-800">Daftar Misi Micro-Volunteering PPKn</h2>
+                    <div id="missions-grid" class="grid grid-cols-1 md:grid-cols-2 gap-6"></div>
+                </div>
+
+                <!-- HALAMAN FORM TUGAS & KAMERA -->
+                <div id="view-student-submit" class="space-y-6 hidden">
+                    <button onclick="navigate('student-missions')" class="text-sm font-semibold text-blue-600 hover:underline">← Kembali ke Misi</button>
+                    <div class="bg-white p-8 rounded-2xl border border-blue-100 shadow-sm space-y-6">
+                        <div>
+                            <span id="sub-category" class="text-xs font-bold text-blue-700 bg-blue-100 px-3 py-1 rounded-full">Kategori</span>
+                            <h2 id="sub-title" class="text-2xl font-bold text-slate-800 mt-2">Judul</h2>
+                            <p id="sub-desc" class="text-slate-600 mt-2 text-sm leading-relaxed"></p>
+                        </div>
+
+                        <form onsubmit="submitStudentTask(event)" class="space-y-6 pt-4 border-t">
+                            <input type="hidden" id="active-mission-id">
+                            <div>
+                                <label class="block text-sm font-semibold mb-2 text-slate-700">Tuliskan Pikiran / Refleksi Esai Aksi Nyata:</label>
+                                <textarea id="essay-response" rows="5" required class="w-full p-4 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm" placeholder="Tuliskan laporan esai atau uraian pelaksanaan aksi sosialmu di sini..."></textarea>
+                            </div>
+
+                            <div class="space-y-3">
+                                <label class="block text-sm font-semibold text-slate-700">Dokumentasikan Aksi Positif (Kamera AI atau Unggah File)</label>
+                                <div class="flex flex-wrap gap-4">
+                                    <button type="button" onclick="openCameraModal()" class="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2.5 rounded-xl text-sm font-medium transition flex items-center space-x-2">
+                                        <i data-lucide="camera" class="w-4 h-4"></i><span>Buka Kamera AI</span>
+                                    </button>
+                                    <input type="file" id="file-upload" accept="image/*" onchange="previewImageFile(event)" class="text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-blue-50 file:text-blue-700">
+                                </div>
+                                <div id="preview-box" class="hidden mt-2 space-y-2">
+                                    <img id="preview-img" class="max-h-48 rounded-xl border object-cover">
+                                    <div id="ai-badge-result" class="p-3 rounded-xl text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 hidden">
+                                        🤖 <span id="ai-result-text">AI mendeteksi objek relevan...</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button type="submit" id="btn-submit-task" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition shadow-lg shadow-blue-600/20">Kirim Tugas ke Guru</button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- HALAMAN PROFIL SISWA (DENGAN PILIHAN IKON) -->
+                <div id="view-student-profile" class="space-y-6 hidden">
+                    <div class="bg-white p-8 rounded-2xl border border-blue-100 shadow-sm space-y-6">
+                        <div class="flex items-center space-x-4 border-b pb-6">
+                            <div id="profile-avatar-box" class="w-16 h-16 bg-amber-50 border border-amber-200 text-blue-700 rounded-2xl flex items-center justify-center text-3xl font-bold shadow-sm">
+                                🦅
+                            </div>
+                            <div>
+                                <h2 id="profile-name" class="text-2xl font-bold text-blue-900">-</h2>
+                                <p id="profile-class" class="text-sm text-slate-500">-</p>
+                                <span class="inline-block mt-2 text-xs font-semibold bg-blue-50 text-blue-700 px-3 py-1 rounded-full border border-blue-200">Peserta Aksi Bhinneka</span>
+                            </div>
+                        </div>
+
+                        <!-- Pilihan Ikon Profil -->
+                        <div class="space-y-3">
+                            <label class="block text-sm font-semibold text-slate-700">Pilih Ikon / Lambang Profil Kebangsaan:</label>
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                <button type="button" onclick="changeStudentIcon('🦅', 'Garuda Pancasila')" class="flex items-center space-x-2 p-3 border rounded-xl hover:bg-blue-50 transition text-sm font-medium">
+                                    <span class="text-2xl">🦅</span> <span>Garuda Pancasila</span>
+                                </button>
+                                <button type="button" onclick="changeStudentIcon('🌳', 'Pohon Beringin')" class="flex items-center space-x-2 p-3 border rounded-xl hover:bg-blue-50 transition text-sm font-medium">
+                                    <span class="text-2xl">🌳</span> <span>Pohon Beringin</span>
+                                </button>
+                                <button type="button" onclick="changeStudentIcon('⭐', 'Bintang Emas')" class="flex items-center space-x-2 p-3 border rounded-xl hover:bg-blue-50 transition text-sm font-medium">
+                                    <span class="text-2xl">⭐</span> <span>Bintang Emas</span>
+                                </button>
+                                <button type="button" onclick="changeStudentIcon('🌾', 'Padi & Kapas')" class="flex items-center space-x-2 p-3 border rounded-xl hover:bg-blue-50 transition text-sm font-medium">
+                                    <span class="text-2xl">🌾</span> <span>Padi & Kapas</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t">
+                            <div class="bg-blue-50/50 p-6 rounded-xl border border-blue-100 text-center">
+                                <p class="text-sm text-slate-500">Total Poin (XP)</p>
+                                <h3 id="profile-xp" class="text-3xl font-bold text-amber-500 mt-2">0 XP</h3>
+                            </div>
+                            <div class="bg-blue-50/50 p-6 rounded-xl border border-blue-100 text-center">
+                                <p class="text-sm text-slate-500">Misi Selesai</p>
+                                <h3 id="profile-completed-missions" class="text-3xl font-bold text-blue-900 mt-2">0</h3>
+                            </div>
+                            <div class="bg-blue-50/50 p-6 rounded-xl border border-blue-100 text-center">
+                                <p class="text-sm text-slate-500">Validasi Disetujui</p>
+                                <h3 id="profile-approved-validations" class="text-3xl font-bold text-emerald-600 mt-2">0</h3>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- HALAMAN PUBLIKASI (SISWA & GURU) -->
+                <div id="view-publication" class="space-y-6 hidden">
+                    <div class="bg-white p-6 rounded-2xl border border-blue-100 shadow-sm space-y-2">
+                        <h2 class="text-lg font-bold text-blue-900">Publikasi Aksi Nyata Nusantara</h2>
+                        <p class="text-xs text-slate-500">Galeri dokumentasi aksi positif kebhinekaan dan kepedulian sosial siswa di lingkungan sekitar.</p>
+                    </div>
+                    <div id="publication-grid" class="grid grid-cols-1 md:grid-cols-2 gap-6"></div>
+                </div>
+
+                <!-- HALAMAN LEADERBOARD SISWA -->
+                <div id="view-student-leaderboard" class="space-y-6 hidden">
+                    <h2 class="text-lg font-bold text-slate-800">Papan Peringkat Olimpiade Aksi PPKn</h2>
+                    <div class="bg-white rounded-2xl border border-blue-100 overflow-hidden shadow-sm">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-blue-50/50 border-b border-blue-100 text-xs text-slate-500 uppercase">
+                                    <th class="p-4">Nama Siswa</th>
+                                    <th class="p-4">Kelas</th>
+                                    <th class="p-4 text-right">XP</th>
+                                </tr>
+                            </thead>
+                            <tbody id="student-leaderboard-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- ================= DASHBOARD GURU ================= -->
+                <div id="view-teacher-dashboard" class="space-y-6 hidden">
+                    <div class="bg-white p-6 rounded-2xl border border-blue-100 shadow-sm space-y-4">
+                        <div class="flex items-center space-x-2 text-blue-700 text-xs font-semibold">
+                            <span>🦅 GURU</span>
+                        </div>
+                        <div>
+                            <h2 class="text-xl font-bold text-blue-900">Dashboard Guru</h2>
+                            <p class="text-xs text-slate-500 mt-1">Pantau dan verifikasi aksi nyata yang dilakukan siswa.</p>
+                        </div>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 pt-2">
+                            <div class="bg-blue-50/50 p-4 rounded-xl border border-blue-100 text-center">
+                                <p class="text-xs text-slate-500">Total Bukti</p>
+                                <h3 id="stat-total" class="text-2xl font-bold text-blue-900 mt-1">0</h3>
+                            </div>
+                            <div class="bg-amber-50/50 p-4 rounded-xl border border-amber-100 text-center">
+                                <p class="text-xs text-slate-500">Menunggu</p>
+                                <h3 id="stat-pending" class="text-2xl font-bold text-amber-600 mt-1">0</h3>
+                            </div>
+                            <div class="bg-emerald-50/50 p-4 rounded-xl border border-emerald-100 text-center">
+                                <p class="text-xs text-slate-500">Diterima</p>
+                                <h3 id="stat-approved" class="text-2xl font-bold text-emerald-600 mt-1">0</h3>
+                            </div>
+                            <div class="bg-rose-50/50 p-4 rounded-xl border border-rose-100 text-center">
+                                <p class="text-xs text-slate-500">Ditolak</p>
+                                <h3 id="stat-rejected" class="text-2xl font-bold text-rose-600 mt-1">0</h3>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- HALAMAN VERIFIKASI BUKTI GURU -->
+                <div id="view-teacher-verification" class="space-y-6 hidden">
+                    <div class="bg-white p-6 rounded-2xl border border-blue-100 shadow-sm space-y-2">
+                        <h2 class="text-lg font-bold text-blue-900">Verifikasi Bukti Aksi Siswa</h2>
+                        <p class="text-xs text-slate-500">Periksa bukti aksi siswa sebelum memberikan poin dan menyetujuinya untuk publikasi.</p>
+                    </div>
+                    <div id="teacher-grading-list" class="space-y-4"></div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- ================= MODAL KAMERA & SCAN AI ================= -->
+    <div id="camera-modal" class="fixed inset-0 bg-slate-900/70 z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl max-w-lg w-full p-6 space-y-4 text-center border border-blue-100">
+            <h3 class="font-bold text-lg text-blue-900">Kamera Deteksi Objek AI</h3>
+            <div class="relative bg-slate-900 rounded-xl overflow-hidden aspect-video flex items-center justify-center">
+                <video id="video-stream" autoplay playsinline class="w-full h-full object-cover"></video>
+                <canvas id="canvas-stream" class="hidden"></canvas>
+                <div class="absolute inset-0 border-2 border-blue-500/50 pointer-events-none flex flex-col justify-between p-3">
+                    <div class="flex justify-between text-[10px] text-blue-300 font-mono"><span>AI_VISION_ACTIVE</span><span>98.4%</span></div>
+                    <div class="text-center text-xs text-blue-200 font-mono bg-slate-900/60 py-1 rounded">Arahkan kamera ke dokumentasi aksi di lingkungan sekitar</div>
+                </div>
+            </div>
+            <div class="flex justify-center space-x-3">
+                <button type="button" onclick="takeSnapshot()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl font-medium">Ambil & Scan AI</button>
+                <button type="button" onclick="closeCameraModal()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-6 py-2.5 rounded-xl font-medium">Tutup</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= SCRIPT UTAMA ================= -->
+    <script>
+        const missionsData = [
+            { id: 1, title: "Bantu UMKM Lokal & Digitalisasi", category: "Gotong Royong", desc: "Datangi pedagang kecil sekitar, bantu promosikan atau daftarkan lokasinya di Google Maps.", xp: 100, aiKeyword: "Warung/Kios UMKM terdeteksi (Akurasi 94%)" },
+            { id: 2, title: "Jurnalisme Kebhinnekaan", category: "Bhinneka Tunggal Ika", desc: "Wawancara ringan lintas iman atau suku dengan tetangga, tuliskan kisah inspiratif toleransi.", xp: 75, aiKeyword: "Dokumentasi Wawancara Lintas Warga terdeteksi (Akurasi 91%)" },
+            { id: 3, title: "Trash Mapping & Cleanup", category: "Lingkungan", desc: "Petakan titik tumpukan sampah ilegal, ambil foto dengan koordinat, dan lakukan bersih-bersih mikro.", xp: 80, aiKeyword: "Objek Botol Plastik / Sampah Anorganik terdeteksi (Akurasi 96%)" },
+            { id: 4, title: "Cyber Patriot (Cek Fakta Hoaks)", category: "Bela Negara", desc: "Lakukan fact-checking berita hoaks dan buat konten edukasi penangkalnya.", xp: 90, aiKeyword: "Tangkapan Layar Verifikasi Fakta / Infografis terdeteksi (Akurasi 93%)" }
+        ];
+
+        let currentUser = JSON.parse(localStorage.getItem('aksi_user')) || null;
+        let videoStream = null;
+        let capturedImageBase64 = "";
+        let currentAiAnalysis = "";
+
+        window.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            if (currentUser) {
+                document.getElementById('auth-modal').classList.add('hidden');
+                document.getElementById('app-container').classList.remove('hidden');
+                initAppLayout();
+            }
+        });
+
+        function switchLoginTab(role) {
+            if (role === 'student') {
+                document.getElementById('tab-student').className = "flex-1 py-2 text-sm font-semibold rounded-lg bg-white shadow-sm transition text-blue-900";
+                document.getElementById('tab-teacher').className = "flex-1 py-2 text-sm font-semibold text-slate-500 transition";
+                document.getElementById('form-student').classList.remove('hidden');
+                document.getElementById('form-teacher').classList.add('hidden');
+            } else {
+                document.getElementById('tab-teacher').className = "flex-1 py-2 text-sm font-semibold rounded-lg bg-white shadow-sm transition text-blue-900";
+                document.getElementById('tab-student').className = "flex-1 py-2 text-sm font-semibold text-slate-500 transition";
+                document.getElementById('form-teacher').classList.remove('hidden');
+                document.getElementById('form-student').classList.add('hidden');
+            }
+        }
+
+        function handleLogin(e, role) {
+            e.preventDefault();
+            if (role === 'student') {
+                const name = document.getElementById('student-name').value;
+                const studentClass = document.getElementById('student-class').value;
+                currentUser = { name, class: studentClass, role: 'student', xp: 50, avatar: '🦅' };
+                localStorage.setItem('aksi_user', JSON.stringify(currentUser));
+                document.getElementById('auth-modal').classList.add('hidden');
+                document.getElementById('app-container').classList.remove('hidden');
+                initAppLayout();
+            } else {
+                const name = document.getElementById('teacher-name').value;
+                const code = document.getElementById('teacher-code').value;
+                const errorMsg = document.getElementById('teacher-error-msg');
+                if (code !== 'GURU2026') {
+                    errorMsg.classList.remove('hidden');
+                    return;
+                }
+                errorMsg.classList.add('hidden');
+                currentUser = { name, role: 'teacher' };
+                localStorage.setItem('aksi_user', JSON.stringify(currentUser));
+                document.getElementById('auth-modal').classList.add('hidden');
+                document.getElementById('app-container').classList.remove('hidden');
+                initAppLayout();
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('aksi_user');
+            location.reload();
+        }
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('app-sidebar');
+            const overlay = document.getElementById('sidebar-overlay');
+            sidebar.classList.toggle('-translate-x-full');
+            overlay.classList.toggle('hidden');
+        }
+
+        function changeStudentIcon(iconSymbol) {
+            currentUser.avatar = iconSymbol;
+            localStorage.setItem('aksi_user', JSON.stringify(currentUser));
+            initAppLayout();
+            renderStudentProfile();
+            alert('Ikon profil berhasil diperbarui!');
+        }
+
+        function initAppLayout() {
+            const sidebar = document.getElementById('app-sidebar');
+            sidebar.innerHTML = '';
+
+            if (currentUser.role === 'student') {
+                if (!currentUser.avatar) currentUser.avatar = '🦅';
+                sidebar.innerHTML = `
+                    <div>
+                        <div class="p-6 border-b border-blue-100 flex items-center justify-between">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-10 h-10 flex items-center justify-center bg-amber-50 rounded-xl border border-amber-200 text-xl shadow-sm">
+                                    ${currentUser.avatar}
+                                </div>
+                                <div>
+                                    <h2 class="font-bold text-lg text-blue-900 leading-tight">AksiBhinneka</h2>
+                                    <span class="text-xs text-slate-400">Portal Siswa</span>
+                                </div>
+                            </div>
+                            <button onclick="toggleSidebar()" class="md:hidden text-slate-500 hover:text-slate-800"><i data-lucide="x" class="w-5 h-5"></i></button>
+                        </div>
+                        <nav class="p-4 space-y-1">
+                            <button onclick="navigate('student-dashboard'); toggleSidebar();" id="nav-student-dashboard" class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-sm font-medium bg-blue-50 text-blue-700 transition">
+                                <i data-lucide="layout-dashboard" class="w-5 h-5"></i><span>Dashboard</span>
+                            </button>
+                            <button onclick="navigate('student-missions'); toggleSidebar();" id="nav-student-missions" class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 transition">
+                                <i data-lucide="target" class="w-5 h-5"></i><span>Daftar Misi</span>
+                            </button>
+                            <button onclick="navigate('student-profile'); toggleSidebar();" id="nav-student-profile" class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 transition">
+                                <i data-lucide="user" class="w-5 h-5"></i><span>Profil Peserta</span>
+                            </button>
+                            <button onclick="navigate('publication'); toggleSidebar();" id="nav-publication" class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 transition">
+                                <i data-lucide="globe" class="w-5 h-5"></i><span>Publikasi Aksi</span>
+                            </button>
+                            <button onclick="navigate('student-leaderboard'); toggleSidebar();" id="nav-student-leaderboard" class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 transition">
+                                <i data-lucide="trophy" class="w-5 h-5"></i><span>Papan Peringkat</span>
+                            </button>
+                        </nav>
+                    </div>
+                    <div class="p-4 border-t border-blue-100 bg-blue-50/30 flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-bold text-slate-800">${currentUser.name}</p>
+                            <p class="text-xs text-slate-500">Kelas: ${currentUser.class}</p>
+                        </div>
+                        <button onclick="logout()" class="text-rose-500 hover:bg-rose-50 p-2 rounded-lg transition" title="Keluar"><i data-lucide="log-out" class="w-5 h-5"></i></button>
+                    </div>
+                `;
+               document.getElementById('header-right-info').innerHTML = `
+    <div class="bg-blue-50 text-blue-700 px-3.5 py-1.5 rounded-full text-xs md:text-sm font-semibold border border-blue-200 whitespace-nowrap flex items-center gap-1">
+        ⚡ <span id="header-xp">50</span> XP
+    </div>
+`;
+                updateStudentXPDisplay();
+                navigate('student-dashboard');
+            } else {
+                sidebar.className = "fixed inset-y-0 left-0 z-40 w-64 bg-slate-900 text-white flex flex-col justify-between transform -translate-x-full transition-transform duration-300 ease-in-out shadow-xl overflow-y-auto";
+                sidebar.innerHTML = `
+                    <div>
+                        <div class="p-6 border-b border-slate-800 flex items-center justify-between">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-10 h-10 flex items-center justify-center bg-slate-800 rounded-xl border border-slate-700 text-xl">🦅</div>
+                                <div>
+                                    <h2 class="font-bold text-lg leading-tight">Portal Guru</h2>
+                                    <span class="text-xs text-slate-400">AksiBhinneka PPKn</span>
+                                </div>
+                            </div>
+                            <button onclick="toggleSidebar()" class="md:hidden text-slate-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+                        </div>
+                        <nav class="p-4 space-y-1">
+                            <button onclick="navigate('teacher-dashboard'); toggleSidebar();" id="nav-teacher-dashboard" class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-sm font-medium bg-blue-600 text-white transition">
+                                <i data-lucide="layout-dashboard" class="w-5 h-5"></i><span>Dashboard</span>
+                            </button>
+                            <button onclick="navigate('teacher-verification'); toggleSidebar();" id="nav-teacher-verification" class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-sm font-medium text-slate-300 hover:bg-slate-800 transition">
+                                <i data-lucide="check-square" class="w-5 h-5"></i><span>Verifikasi Bukti</span>
+                            </button>
+                            <button onclick="navigate('publication'); toggleSidebar();" id="nav-publication" class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-sm font-medium text-slate-300 hover:bg-slate-800 transition">
+                                <i data-lucide="globe" class="w-5 h-5"></i><span>Publikasi</span>
+                            </button>
+                        </nav>
+                    </div>
+                    <div class="p-4 border-t border-slate-800 flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-bold">${currentUser.name}</p>
+                            <p class="text-xs text-slate-400">Guru Verifikator</p>
+                        </div>
+                        <button onclick="logout()" class="text-rose-400 hover:bg-slate-800 p-2 rounded-lg transition" title="Keluar"><i data-lucide="log-out" class="w-5 h-5"></i></button>
+                    </div>
+                `;
+                document.getElementById('header-right-info').innerHTML = `<span class="text-xs text-slate-500 bg-slate-100 px-3 py-1 rounded-lg">Akses Penilaian Aktif</span>`;
+                navigate('teacher-dashboard');
+            }
+            lucide.createIcons();
+        }
+
+        function navigate(viewId) {
+            ['student-dashboard', 'student-missions', 'student-submit', 'student-profile', 'publication', 'student-leaderboard', 'teacher-dashboard', 'teacher-verification'].forEach(v => {
+                const el = document.getElementById(`view-${v}`);
+                if (el) el.classList.add('hidden');
+                const btn = document.getElementById(`nav-${v}`);
+                if (btn && currentUser.role === 'student') {
+                    btn.className = "w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 transition";
+                } else if (btn && currentUser.role === 'teacher') {
+                    btn.className = "w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-sm font-medium text-slate-300 hover:bg-slate-800 transition";
+                }
+            });
+
+            const target = document.getElementById(`view-${viewId}`);
+            if (target) target.classList.remove('hidden');
+            const activeNav = document.getElementById(`nav-${viewId}`);
+            if (activeNav) {
+                if (currentUser.role === 'student') {
+                    activeNav.className = "w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-sm font-medium bg-blue-50 text-blue-700 transition";
+                } else {
+                    activeNav.className = "w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-sm font-medium bg-blue-600 text-white transition";
+                }
+            }
+
+            const titles = {
+                'student-dashboard': 'Dashboard Siswa',
+                'student-missions': 'Daftar Misi Micro-Volunteering',
+                'student-submit': 'Kirim Bukti Aksi & Scan AI',
+                'student-profile': 'Profil Peserta Aksi Bhinneka',
+                'publication': 'Publikasi Aksi Nyata',
+                'student-leaderboard': 'Papan Peringkat',
+                'teacher-dashboard': 'Dashboard Guru',
+                'teacher-verification': 'Verifikasi Bukti Aksi Siswa'
+            };
+            document.getElementById('page-title').innerText = titles[viewId] || 'Dashboard';
+
+            if (viewId === 'student-missions') renderMissionsGrid();
+            if (viewId === 'student-profile') renderStudentProfile();
+            if (viewId === 'publication') renderPublicationGallery();
+            if (viewId === 'student-leaderboard') renderStudentLeaderboard();
+            if (viewId === 'teacher-dashboard') renderTeacherDashboardStats();
+            if (viewId === 'teacher-verification') renderTeacherGradingList();
+        }
+
+        function renderMissionsGrid() {
+            const grid = document.getElementById('missions-grid');
+            grid.innerHTML = '';
+            missionsData.forEach(m => {
+                grid.innerHTML += `
+                    <div class="bg-white p-6 rounded-2xl border border-blue-100 shadow-sm flex flex-col justify-between space-y-4">
+                        <div>
+                            <span class="text-xs font-bold text-blue-700 bg-blue-100 px-3 py-1 rounded-full">${m.category}</span>
+                            <h3 class="font-bold text-lg text-slate-800 mt-3">${m.title}</h3>
+                            <p class="text-sm text-slate-600 mt-2 leading-relaxed">${m.desc}</p>
+                        </div>
+                        <div class="pt-4 border-t flex justify-between items-center">
+                            <span class="text-xs font-bold text-amber-600 bg-amber-50 px-2.5 py-1 rounded-lg">+${m.xp} XP</span>
+                            <button onclick="openMissionForm(${m.id})" class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2 rounded-xl font-medium transition">Kerjakan Misi</button>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        function openMissionForm(id) {
+            const m = missionsData.find(x => x.id === id);
+            document.getElementById('active-mission-id').value = m.id;
+            document.getElementById('sub-category').innerText = m.category;
+            document.getElementById('sub-title').innerText = m.title;
+            document.getElementById('sub-desc').innerText = m.desc;
+            document.getElementById('essay-response').value = '';
+            document.getElementById('preview-box').classList.add('hidden');
+            capturedImageBase64 = "";
+            currentAiAnalysis = "";
+            navigate('student-submit');
+        }
+
+        function previewImageFile(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(evt) {
+                    capturedImageBase64 = evt.target.result;
+                    document.getElementById('preview-img').src = capturedImageBase64;
+                    
+                    const missionId = parseInt(document.getElementById('active-mission-id').value);
+                    const mission = missionsData.find(x => x.id === missionId);
+                    currentAiAnalysis = mission.aiKeyword;
+
+                    document.getElementById('ai-result-text').innerText = currentAiAnalysis;
+                    document.getElementById('ai-badge-result').classList.remove('hidden');
+                    document.getElementById('preview-box').classList.remove('hidden');
+                }
+                reader.readAsDataURL(file);
+            }
+        }
+
+        async function openCameraModal() {
+            document.getElementById('camera-modal').classList.remove('hidden');
+            try {
+                videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                document.getElementById('video-stream').srcObject = videoStream;
+            } catch (err) {
+                alert('Tidak dapat mengakses kamera perangkat.');
+            }
+        }
+
+        function closeCameraModal() {
+            if (videoStream) videoStream.getTracks().forEach(t => t.stop());
+            document.getElementById('camera-modal').classList.add('hidden');
+        }
+
+        function takeSnapshot() {
+            const video = document.getElementById('video-stream');
+            const canvas = document.getElementById('canvas-stream');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            capturedImageBase64 = canvas.toDataURL('image/png');
+            
+            document.getElementById('preview-img').src = capturedImageBase64;
+
+            const missionId = parseInt(document.getElementById('active-mission-id').value);
+            const mission = missionsData.find(x => x.id === missionId);
+            currentAiAnalysis = mission.aiKeyword;
+
+            document.getElementById('ai-result-text').innerText = currentAiAnalysis;
+            document.getElementById('ai-badge-result').classList.remove('hidden');
+            document.getElementById('preview-box').classList.remove('hidden');
+            closeCameraModal();
+        }
+
+        function submitStudentTask(e) {
+            e.preventDefault();
+            if (!capturedImageBase64) {
+                alert('Harap sertakan bukti foto aksi melalui kamera AI atau unggah file!');
+                return;
+            }
+            const missionId = parseInt(document.getElementById('active-mission-id').value);
+            const m = missionsData.find(x => x.id === missionId);
+            const essay = document.getElementById('essay-response').value;
+
+            let subs = JSON.parse(localStorage.getItem('aksi_submissions')) || [];
+            subs.push({
+                id: Date.now(),
+                studentName: currentUser.name,
+                studentClass: currentUser.class,
+                missionTitle: m.title,
+                essay: essay,
+                image: capturedImageBase64,
+                aiStatus: currentAiAnalysis || "Objek Terverifikasi AI",
+                status: 'pending',
+                xp: m.xp
+            });
+            localStorage.setItem('aksi_submissions', JSON.stringify(subs));
+            alert('Tugas dan hasil scan AI berhasil dikirim ke dashboard guru!');
+            navigate('student-missions');
+        }
+
+        function renderStudentProfile() {
+            document.getElementById('profile-name').innerText = currentUser.name;
+            document.getElementById('profile-class').innerText = `Kelas: ${currentUser.class}`;
+            if (!currentUser.avatar) currentUser.avatar = '🦅';
+
+            document.getElementById('profile-avatar-box').innerText = currentUser.avatar;
+
+            let lb = JSON.parse(localStorage.getItem('aksi_leaderboard')) || [];
+            let me = lb.find(u => u.name === currentUser.name);
+            let currentXp = me ? me.xp : (currentUser.xp || 50);
+            document.getElementById('profile-xp').innerText = currentXp + " XP";
+
+            let subs = JSON.parse(localStorage.getItem('aksi_submissions')) || [];
+            let mySubs = subs.filter(s => s.studentName === currentUser.name);
+            let approvedSubs = mySubs.filter(s => s.status === 'approved');
+
+            document.getElementById('profile-completed-missions').innerText = mySubs.length;
+            document.getElementById('profile-approved-validations').innerText = approvedSubs.length;
+        }
+
+        function renderPublicationGallery() {
+            const grid = document.getElementById('publication-grid');
+            grid.innerHTML = '';
+            let subs = JSON.parse(localStorage.getItem('aksi_submissions')) || [];
+            let publishedSubs = subs.filter(s => s.status === 'approved');
+
+            if (publishedSubs.length === 0) {
+                grid.innerHTML = `<div class="bg-white p-8 rounded-2xl border text-center text-slate-400 shadow-sm md:col-span-2">Belum ada aksi nyata yang dipublikasikan.</div>`;
+                return;
+            }
+
+            publishedSubs.forEach(sub => {
+                grid.innerHTML += `
+                    <div class="bg-white p-6 rounded-2xl border border-blue-100 shadow-sm space-y-3">
+                        <span class="text-xs font-bold text-blue-700 bg-blue-100 px-2.5 py-1 rounded-full">${sub.missionTitle}</span>
+                        <div class="flex items-center space-x-2 text-xs text-slate-500">
+                            <span>Oleh: <strong>${sub.studentName}</strong> (${sub.studentClass})</span>
+                        </div>
+                        <img src="${sub.image}" class="rounded-xl border h-48 object-cover w-full">
+                        <p class="text-sm text-slate-700 bg-slate-50 p-3 rounded-xl">"${sub.essay}"</p>
+                        <div class="text-[11px] text-emerald-600 font-semibold flex items-center space-x-1">
+                            <span>✅ Terverifikasi & Dipublikasikan</span>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        function renderStudentLeaderboard() {
+            const tbody = document.getElementById('student-leaderboard-tbody');
+            tbody.innerHTML = '';
+            let lb = JSON.parse(localStorage.getItem('aksi_leaderboard')) || [
+                { name: currentUser.name, class: currentUser.class, xp: currentUser.xp }
+            ];
+            lb.sort((a,b) => b.xp - a.xp);
+            lb.forEach(u => {
+                tbody.innerHTML += `
+                    <tr class="border-b border-blue-50">
+                        <td class="p-4 font-medium">${u.name}</td>
+                        <td class="p-4 text-slate-600">${u.class}</td>
+                        <td class="p-4 text-right font-bold text-blue-700">${u.xp} XP</td>
+                    </tr>
+                `;
+            });
+        }
+
+        function updateStudentXPDisplay() {
+            let lb = JSON.parse(localStorage.getItem('aksi_leaderboard')) || [];
+            let me = lb.find(u => u.name === currentUser.name);
+            let currentXp = me ? me.xp : (currentUser.xp || 50);
+            const badge = document.getElementById('header-xp');
+            if (badge) badge.innerText = currentXp;
+            const dashXp = document.getElementById('dash-student-xp');
+            if (dashXp) dashXp.innerText = currentXp + " XP";
+        }
+
+        function renderTeacherDashboardStats() {
+            let subs = JSON.parse(localStorage.getItem('aksi_submissions')) || [];
+            let pending = subs.filter(s => s.status === 'pending').length;
+            let approved = subs.filter(s => s.status === 'approved').length;
+            let rejected = subs.filter(s => s.status === 'rejected').length;
+
+            document.getElementById('stat-total').innerText = subs.length;
+            document.getElementById('stat-pending').innerText = pending;
+            document.getElementById('stat-approved').innerText = approved;
+            document.getElementById('stat-rejected').innerText = rejected;
+        }
+
+        function renderTeacherGradingList() {
+            const list = document.getElementById('teacher-grading-list');
+            list.innerHTML = '';
+            let subs = JSON.parse(localStorage.getItem('aksi_submissions')) || [];
+            let pending = subs.filter(s => s.status === 'pending');
+
+            if (pending.length === 0) {
+                list.innerHTML = `<div class="bg-white p-8 rounded-2xl border text-center text-slate-400 shadow-sm">Belum ada bukti tugas siswa yang menunggu verifikasi.</div>`;
+                return;
+            }
+
+            pending.forEach(sub => {
+                list.innerHTML += `
+                    <div class="bg-white p-6 rounded-2xl border border-blue-100 shadow-sm space-y-4">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <span class="text-xs font-bold text-blue-700 bg-blue-100 px-2.5 py-1 rounded-full">${sub.missionTitle}</span>
+                                <h3 class="font-bold text-base text-slate-800 mt-2">${sub.studentName} <span class="text-xs text-slate-400 font-normal">(${sub.studentClass})</span></h3>
+                            </div>
+                            <span class="text-xs font-semibold bg-amber-50 text-amber-700 px-3 py-1 rounded-lg">Menunggu Verifikasi</span>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <img src="${sub.image}" class="rounded-xl border h-40 object-cover w-full">
+                                <div class="mt-2 text-xs font-semibold text-blue-700 bg-blue-50 p-2 rounded-lg border border-blue-200">
+                                    🤖 AI Scan: ${sub.aiStatus || 'Terverifikasi'}
+                                </div>
+                            </div>
+                            <div class="md:col-span-2 bg-slate-50 p-4 rounded-xl text-sm text-slate-700 space-y-2">
+                                <p class="font-semibold text-slate-900">Refleksi Esai / Pikiran Siswa:</p>
+                                <p>${sub.essay}</p>
+                            </div>
+                        </div>
+                        <div class="flex justify-end space-x-3 pt-2">
+                            <button onclick="gradeTask(${sub.id}, 'approved')" class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-5 py-2 rounded-xl font-medium transition">Setujui & Publikasikan (+${sub.xp} XP)</button>
+                            <button onclick="gradeTask(${sub.id}, 'rejected')" class="bg-rose-50 hover:bg-rose-100 text-rose-600 text-sm px-5 py-2 rounded-xl font-medium transition">Tolak</button>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        function gradeTask(id, status) {
+            let subs = JSON.parse(localStorage.getItem('aksi_submissions')) || [];
+            let sub = subs.find(s => s.id === id);
+            sub.status = status;
+            localStorage.setItem('aksi_submissions', JSON.stringify(subs));
+
+            if (status === 'approved') {
+                let lb = JSON.parse(localStorage.getItem('aksi_leaderboard')) || [];
+                let userLb = lb.find(u => u.name === sub.studentName);
+                if (userLb) {
+                    userLb.xp += sub.xp;
+                } else {
+                    lb.push({ name: sub.studentName, class: sub.studentClass, xp: 50 + sub.xp });
+                }
+                localStorage.setItem('aksi_leaderboard', JSON.stringify(lb));
+            }
+            renderTeacherGradingList();
+            renderTeacherDashboardStats();
+            alert('Verifikasi dan penilaian berhasil disimpan!');
+        }
+    </script>
+<!--
+=====================================================================
+ CARA PAKAI (2 langkah di file HTML Anda)
+
+ A) Di dalam <head>, tepat di bawah baris <script src="https://unpkg.com/lucide@latest"></script>, tempel:
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+
+ B) Tempel SELURUH blok <script> di bawah ini TEPAT SEBELUM </body>,
+    yaitu setelah script utama yang sudah ada. Fungsi-fungsi di bawah
+    akan menggantikan versi localStorage yang lama.
+=====================================================================
+-->
+
+<script>
+/* ================= KONEKSI SUPABASE ================= */
+const SUPABASE_URL = "https://yracerxtwjjljtjmlpar.supabase.co";
+const SUPABASE_KEY = "sb_publishable__ZjBJ5Z_DVZAPKxZxEMy4g_AzdyQ-oC";
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// Cegah XSS saat menampilkan teks dari pengguna
+function esc(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+/* ================= LOGIN ================= */
+async function handleLogin(e, role) {
+    e.preventDefault();
+    if (role === 'student') {
+        const name = document.getElementById('student-name').value.trim();
+        const studentClass = document.getElementById('student-class').value.trim();
+
+        let { data: row, error } = await db.from('students').select('*')
+            .eq('name', name).eq('class', studentClass).maybeSingle();
+        if (!error && !row) {
+            const r = await db.from('students').insert({ name, class: studentClass }).select().single();
+            row = r.data; error = r.error;
+        }
+        if (error || !row) { console.error(error); alert('Gagal masuk ke database. Coba lagi.'); return; }
+
+        currentUser = { id: row.id, name: row.name, class: row.class, role: 'student', xp: row.xp, avatar: row.avatar };
+    } else {
+        const name = document.getElementById('teacher-name').value;
+        const code = document.getElementById('teacher-code').value;
+        const errorMsg = document.getElementById('teacher-error-msg');
+        if (code !== 'GURU2026') { errorMsg.classList.remove('hidden'); return; }
+        errorMsg.classList.add('hidden');
+        currentUser = { name, role: 'teacher' };
+    }
+    localStorage.setItem('aksi_user', JSON.stringify(currentUser));
+    document.getElementById('auth-modal').classList.add('hidden');
+    document.getElementById('app-container').classList.remove('hidden');
+    initAppLayout();
+}
+
+/* ================= PROFIL & XP ================= */
+async function changeStudentIcon(iconSymbol) {
+    const { error } = await db.from('students').update({ avatar: iconSymbol }).eq('id', currentUser.id);
+    if (error) { alert('Gagal menyimpan ikon.'); return; }
+    currentUser.avatar = iconSymbol;
+    localStorage.setItem('aksi_user', JSON.stringify(currentUser));
+    initAppLayout();
+    renderStudentProfile();
+    alert('Ikon profil berhasil diperbarui!');
+}
+
+async function updateStudentXPDisplay() {
+    const { data } = await db.from('students').select('xp').eq('id', currentUser.id).single();
+    const xp = data ? data.xp : (currentUser.xp || 50);
+    const badge = document.getElementById('header-xp');
+    if (badge) badge.innerText = xp;
+    const dashXp = document.getElementById('dash-student-xp');
+    if (dashXp) dashXp.innerText = xp + " XP";
+}
+
+async function renderStudentProfile() {
+    document.getElementById('profile-name').innerText = currentUser.name;
+    document.getElementById('profile-class').innerText = `Kelas: ${currentUser.class}`;
+    document.getElementById('profile-avatar-box').innerText = currentUser.avatar || '🦅';
+
+    const { data: me } = await db.from('students').select('xp').eq('id', currentUser.id).single();
+    document.getElementById('profile-xp').innerText = (me ? me.xp : 50) + " XP";
+
+    const { data: subs } = await db.from('submissions').select('status').eq('student_id', currentUser.id);
+    const list = subs || [];
+    document.getElementById('profile-completed-missions').innerText = list.length;
+    document.getElementById('profile-approved-validations').innerText = list.filter(s => s.status === 'approved').length;
+}
+
+/* ================= KIRIM TUGAS ================= */
+async function submitStudentTask(e) {
+    e.preventDefault();
+    if (!capturedImageBase64) {
+        alert('Harap sertakan bukti foto aksi melalui kamera AI atau unggah file!');
+        return;
+    }
+    const btn = document.getElementById('btn-submit-task');
+    btn.disabled = true; btn.innerText = 'Mengirim...';
+
+    try {
+        const missionId = parseInt(document.getElementById('active-mission-id').value);
+        const m = missionsData.find(x => x.id === missionId);
+        const essay = document.getElementById('essay-response').value;
+
+        // 1. Upload foto ke Storage
+        const blob = await (await fetch(capturedImageBase64)).blob();
+        const ext = blob.type.includes('png') ? 'png' : 'jpg';
+        const path = `${currentUser.id}/${Date.now()}.${ext}`;
+        const up = await db.storage.from('bukti-aksi').upload(path, blob, { contentType: blob.type });
+        if (up.error) throw up.error;
+        const imageUrl = db.storage.from('bukti-aksi').getPublicUrl(path).data.publicUrl;
+
+        // 2. Simpan data tugas
+        const ins = await db.from('submissions').insert({
+            student_id: currentUser.id,
+            student_name: currentUser.name,
+            student_class: currentUser.class,
+            mission_title: m.title,
+            essay: essay,
+            image_url: imageUrl,
+            ai_status: currentAiAnalysis || 'Objek Terverifikasi AI',
+            xp: m.xp
+        });
+        if (ins.error) throw ins.error;
+
+        alert('Tugas dan hasil scan AI berhasil dikirim ke dashboard guru!');
+        navigate('student-missions');
+    } catch (err) {
+        console.error(err);
+        alert('Gagal mengirim tugas: ' + (err.message || err));
+    } finally {
+        btn.disabled = false; btn.innerText = 'Kirim Tugas ke Guru';
+    }
+}
+
+/* ================= PUBLIKASI ================= */
+async function renderPublicationGallery() {
+    const grid = document.getElementById('publication-grid');
+    grid.innerHTML = '';
+    const { data } = await db.from('submissions').select('*')
+        .eq('status', 'approved').order('created_at', { ascending: false });
+    const list = data || [];
+
+    if (list.length === 0) {
+        grid.innerHTML = `<div class="bg-white p-8 rounded-2xl border text-center text-slate-400 shadow-sm md:col-span-2">Belum ada aksi nyata yang dipublikasikan.</div>`;
+        return;
+    }
+    grid.innerHTML = list.map(sub => `
+        <div class="bg-white p-6 rounded-2xl border border-blue-100 shadow-sm space-y-3">
+            <span class="text-xs font-bold text-blue-700 bg-blue-100 px-2.5 py-1 rounded-full">${esc(sub.mission_title)}</span>
+            <div class="flex items-center space-x-2 text-xs text-slate-500">
+                <span>Oleh: <strong>${esc(sub.student_name)}</strong> (${esc(sub.student_class)})</span>
+            </div>
+            <img src="${esc(sub.image_url)}" class="rounded-xl border h-48 object-cover w-full">
+            <p class="text-sm text-slate-700 bg-slate-50 p-3 rounded-xl">"${esc(sub.essay)}"</p>
+            <div class="text-[11px] text-emerald-600 font-semibold flex items-center space-x-1">
+                <span>✅ Terverifikasi & Dipublikasikan</span>
+            </div>
+        </div>`).join('');
+}
+
+/* ================= LEADERBOARD ================= */
+async function renderStudentLeaderboard() {
+    const tbody = document.getElementById('student-leaderboard-tbody');
+    const { data } = await db.from('students').select('name, class, xp')
+        .order('xp', { ascending: false }).limit(50);
+    tbody.innerHTML = (data || []).map(u => `
+        <tr class="border-b border-blue-50">
+            <td class="p-4 font-medium">${esc(u.name)}</td>
+            <td class="p-4 text-slate-600">${esc(u.class)}</td>
+            <td class="p-4 text-right font-bold text-blue-700">${u.xp} XP</td>
+        </tr>`).join('');
+}
+
+/* ================= DASHBOARD GURU ================= */
+async function renderTeacherDashboardStats() {
+    const { data } = await db.from('submissions').select('status');
+    const subs = data || [];
+    document.getElementById('stat-total').innerText = subs.length;
+    document.getElementById('stat-pending').innerText = subs.filter(s => s.status === 'pending').length;
+    document.getElementById('stat-approved').innerText = subs.filter(s => s.status === 'approved').length;
+    document.getElementById('stat-rejected').innerText = subs.filter(s => s.status === 'rejected').length;
+}
+
+async function renderTeacherGradingList() {
+    const list = document.getElementById('teacher-grading-list');
+    const { data } = await db.from('submissions').select('*')
+        .eq('status', 'pending').order('created_at', { ascending: true });
+    const pending = data || [];
+
+    if (pending.length === 0) {
+        list.innerHTML = `<div class="bg-white p-8 rounded-2xl border text-center text-slate-400 shadow-sm">Belum ada bukti tugas siswa yang menunggu verifikasi.</div>`;
+        return;
+    }
+    list.innerHTML = pending.map(sub => `
+        <div class="bg-white p-6 rounded-2xl border border-blue-100 shadow-sm space-y-4">
+            <div class="flex justify-between items-start">
+                <div>
+                    <span class="text-xs font-bold text-blue-700 bg-blue-100 px-2.5 py-1 rounded-full">${esc(sub.mission_title)}</span>
+                    <h3 class="font-bold text-base text-slate-800 mt-2">${esc(sub.student_name)} <span class="text-xs text-slate-400 font-normal">(${esc(sub.student_class)})</span></h3>
+                </div>
+                <span class="text-xs font-semibold bg-amber-50 text-amber-700 px-3 py-1 rounded-lg">Menunggu Verifikasi</span>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <img src="${esc(sub.image_url)}" class="rounded-xl border h-40 object-cover w-full">
+                    <div class="mt-2 text-xs font-semibold text-blue-700 bg-blue-50 p-2 rounded-lg border border-blue-200">
+                        🤖 AI Scan: ${esc(sub.ai_status || 'Terverifikasi')}
+                    </div>
+                </div>
+                <div class="md:col-span-2 bg-slate-50 p-4 rounded-xl text-sm text-slate-700 space-y-2">
+                    <p class="font-semibold text-slate-900">Refleksi Esai / Pikiran Siswa:</p>
+                    <p>${esc(sub.essay)}</p>
+                </div>
+            </div>
+            <div class="flex justify-end space-x-3 pt-2">
+                <button onclick="gradeTask('${sub.id}', 'approved')" class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-5 py-2 rounded-xl font-medium transition">Setujui & Publikasikan (+${sub.xp} XP)</button>
+                <button onclick="gradeTask('${sub.id}', 'rejected')" class="bg-rose-50 hover:bg-rose-100 text-rose-600 text-sm px-5 py-2 rounded-xl font-medium transition">Tolak</button>
+            </div>
+        </div>`).join('');
+}
+
+async function gradeTask(id, status) {
+    const { data: sub, error } = await db.from('submissions')
+        .update({ status }).eq('id', id).select().single();
+    if (error || !sub) { alert('Gagal menyimpan penilaian.'); return; }
+
+    if (status === 'approved') {
+        const { data: st } = await db.from('students').select('xp').eq('id', sub.student_id).single();
+        if (st) await db.from('students').update({ xp: st.xp + sub.xp }).eq('id', sub.student_id);
+    }
+    renderTeacherGradingList();
+    renderTeacherDashboardStats();
+    alert('Verifikasi dan penilaian berhasil disimpan!');
+}
+</script>
+</body>
+</html>
